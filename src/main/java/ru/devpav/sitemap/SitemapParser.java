@@ -4,11 +4,13 @@ import kong.unirest.HttpResponse;
 import kong.unirest.Unirest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
+import ru.devpav.model.Link;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -23,6 +25,7 @@ import java.util.function.Predicate;
 import static java.util.Objects.isNull;
 
 /*https://fedpress.ru/sitemap/2019-11-08.xml*/
+@Component
 public class SitemapParser {
 
     private static final Set<String> requestExtensions = new HashSet<>();
@@ -37,8 +40,8 @@ public class SitemapParser {
         locLink.addAll(Collections.singletonList("loc"));
     }
 
-    public Set<String> parse(URL url) {
-        Set<String> finalizeLinks = new HashSet<>();
+    public Set<Link> parse(URL url) {
+        Set<Link> finalizeLinks = new HashSet<>();
         try {
             HttpResponse<String> response;
             response = Unirest.get(String.valueOf(url)).asString();
@@ -50,11 +53,13 @@ public class SitemapParser {
         return finalizeLinks;
     }
 
-    public Set<String> parse(String text) {
+    public Set<Link> parse(String text) {
         final Function<String, String> mapRequire = (url) -> {
             HttpResponse<String> response;
             try {
-                response = Unirest.get(url).asString();
+                response = Unirest.get(url)
+                        .socketTimeout(10000)
+                        .asString();
             } catch (Exception ignored) {
                 return null;
             }
@@ -70,7 +75,7 @@ public class SitemapParser {
         return parse(text, mapRequire, docBuilder);
     }
 
-    private Set<String> parse(String urlXml, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
+    private Set<Link> parse(String urlXml, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
 
         if (isNull(docBuilder)) {
             throw new RuntimeException("DocumentBuilder wasn't created");
@@ -90,40 +95,42 @@ public class SitemapParser {
         return parse(dom.getDocumentElement(), deepenFunction, docBuilder);
     }
 
-
-    private Set<String> parse(Node root, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
+    private Set<Link> parse(Node root, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
         final NodeList childNodes = root.getChildNodes();
 
-        final Set<String> strings = new HashSet<>();
+        final Set<Link> links = new HashSet<>();
 
         for (int i = 0; i < childNodes.getLength(); i++) {
             final Node item = childNodes.item(i);
             final Optional<Node> nodeLoc = findNodeLoc(item, locLink);
 
-            if (!nodeLoc.isPresent()) {
-                continue;
-            }
+            if (!nodeLoc.isPresent()) continue;
+
+            Link link = new Link();
 
             final Node loc = nodeLoc.get();
 
             final String nodeValue = loc.getTextContent();
 
+            link.setLink(nodeValue);
+
+            findNodeLoc(item, keyDate)
+                    .ifPresent(nodeDate -> link.setDate(nodeDate.getTextContent()));
+
             final boolean isExistsExtension = isExistsExtension(nodeValue, requestExtensions);
+
+            link.setMiddling(isExistsExtension);
 
             if (isExistsExtension) {
                 final String body = deepenFunction.apply(nodeValue);
-                final Set<String> returnedLinks = parse(body, deepenFunction, docBuilder);
-                strings.addAll(returnedLinks);
+                final Set<Link> returnedLinks = parse(body, deepenFunction, docBuilder);
+                links.addAll(returnedLinks);
             } else {
-                strings.add(nodeValue);
-            }
-
-            if (item.getChildNodes().getLength() == 0) {
-                return strings;
+                links.add(link);
             }
         }
 
-        return strings;
+        return links;
     }
 
     private boolean isExistsExtension(String fileName, Set<String> requestExtensions) {
