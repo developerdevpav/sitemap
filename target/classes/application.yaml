@@ -1,0 +1,16 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: intro-spring-data-redis
+  redis:
+    database: 1
+    jedis:
+      pool:
+        max-active: 150
+        max-idle: 100
+    port: 6379
+    host: localhost
+    password: sber
+    url: redis://${spring.redis.host}:${spring.redis.host}
