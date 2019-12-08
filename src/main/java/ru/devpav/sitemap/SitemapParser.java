@@ -151,7 +151,7 @@ public class SitemapParser {
             final String nodeName = item.getNodeName();
 
             final boolean anyMatch = names.stream().anyMatch(
-                    name -> name.toLowerCase().equals(nodeName.toLowerCase())
+                    name -> name.equalsIgnoreCase(nodeName)
             );
 
             if (anyMatch) {
