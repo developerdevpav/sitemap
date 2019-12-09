@@ -18,27 +18,29 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 
 /*https://fedpress.ru/sitemap/2019-11-08.xml*/
 @Component
 public class SitemapParser {
 
-    private static final Set<String> requestExtensions = new HashSet<>();
-    private static final Set<String> keyDate = new HashSet<>();
-    private static final Set<String> locLink = new HashSet<>();
+    private static final String[] requestExtensions = Stream.of("xml", "php").map(String::toLowerCase).toArray(String[]::new);
+    private static final String[] keyDate = new String[]{"date", "lastmod"};
+    private static final String[] locLink = new String[]{"loc"};
 
     private final static Logger logger = LoggerFactory.getLogger(SitemapParser.class);
-
-    static {
-        requestExtensions.addAll(Arrays.asList("xml", "php"));
-        keyDate.addAll(Arrays.asList("date", "lastmod"));
-        locLink.addAll(Collections.singletonList("loc"));
-    }
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MMM-yyyy HH:mm:ss");
 
     public Set<Link> parse(URL url) {
         Set<Link> finalizeLinks = new HashSet<>();
@@ -57,98 +59,142 @@ public class SitemapParser {
         final Function<String, String> mapRequire = (url) -> {
             HttpResponse<String> response;
             try {
-                response = Unirest.get(url)
-                        .socketTimeout(10000)
-                        .asString();
+                response = Unirest.get(url).asString();
             } catch (Exception ignored) {
                 return null;
             }
             return response.getBody();
         };
 
-        DocumentBuilder docBuilder = null;
-        try {
-            docBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-        } catch (ParserConfigurationException ignored) {
+        BlockingQueue<DocumentBuilder> docBuilderCache = new LinkedBlockingQueue<>();
+        BlockingQueue<HashSet<Link>> setCache = new LinkedBlockingQueue<>();
+
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+
+        for (int i = 0, threadSize = Runtime.getRuntime().availableProcessors() * 2; i < threadSize; i++) {
+            try {
+                setCache.put(new HashSet<>());
+                docBuilderCache.put(documentBuilderFactory.newDocumentBuilder());
+            } catch (InterruptedException | ParserConfigurationException e) {
+                e.printStackTrace();
+            }
         }
 
-        return parse(text, mapRequire, docBuilder);
+        parseToCache(text, mapRequire, docBuilderCache, setCache);
+
+        return setCache
+                .stream()
+                .flatMap(Collection::stream)
+                .collect(Collectors.toSet());
     }
 
-    private Set<Link> parse(String urlXml, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
+    private void parseToCache(String urlXml, Function<String, String> deepenFunction,
+                              BlockingQueue<DocumentBuilder> docBuilderCache,
+                              BlockingQueue<HashSet<Link>> setCache) {
 
-        if (isNull(docBuilder)) {
+        if (isNull(docBuilderCache)) {
             throw new RuntimeException("DocumentBuilder wasn't created");
         }
 
-        Document dom;
+        Document dom = null;
         try {
-            dom = docBuilder.parse(new InputSource(new StringReader(urlXml)));
+            DocumentBuilder builder;
+            if(docBuilderCache.isEmpty()){
+                builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            }else{
+                builder = docBuilderCache.take();
+            }
+
+            dom = builder.parse(new InputSource(new StringReader(urlXml)));
+            docBuilderCache.put(builder);
         } catch (SAXException | IOException e) {
-            return Collections.emptySet();
+            return;
+        } catch (ParserConfigurationException | InterruptedException e) {
+            e.printStackTrace();
         }
 
         if (isNull(dom)) {
             throw new RuntimeException("Root element external document not found");
         }
 
-        return parse(dom.getDocumentElement(), deepenFunction, docBuilder);
+        parseToCache(dom.getDocumentElement(), deepenFunction, docBuilderCache, setCache);
     }
 
-    private Set<Link> parse(Node root, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
+
+    private void parseToCache(Node root, Function<String, String> deepenFunction, BlockingQueue<DocumentBuilder> docBuilder,
+                              BlockingQueue<HashSet<Link>> setCache) {
         final NodeList childNodes = root.getChildNodes();
 
-        final Set<Link> links = new HashSet<>();
+        int len = childNodes.getLength();
+        final List<Node> docNodes = new ArrayList<>(len);
 
         for (int i = 0; i < childNodes.getLength(); i++) {
             final Node item = childNodes.item(i);
-            final Optional<Node> nodeLoc = findNodeLoc(item, locLink);
-
-            if (!nodeLoc.isPresent()) continue;
-
-            Link link = new Link();
-
-            final Node loc = nodeLoc.get();
-
-            final String nodeValue = loc.getTextContent();
-
-            link.setLink(nodeValue);
-
-            findNodeLoc(item, keyDate)
-                    .ifPresent(nodeDate -> link.setDate(nodeDate.getTextContent()));
-
-            final boolean isExistsExtension = isExistsExtension(nodeValue, requestExtensions);
-
-            link.setMiddling(isExistsExtension);
-
-            if (isExistsExtension) {
-                final String body = deepenFunction.apply(nodeValue);
-                final Set<Link> returnedLinks = parse(body, deepenFunction, docBuilder);
-                links.addAll(returnedLinks);
-            } else {
-                links.add(link);
-            }
+            docNodes.add(item);
         }
 
-        return links;
+        docNodes.stream()
+                .parallel()
+                .filter(Objects::nonNull)
+                .forEach(node -> {
+                    final Node nodeLoc = findNode(node, locLink);
+
+                    if (nonNull(nodeLoc)) {
+                        final String nodeValue = nodeLoc.getTextContent();
+
+                        Link link = new Link();
+                        final Node nodeDate = findNode(node, keyDate);
+
+                        if (nonNull(nodeDate)) {
+                            try {
+                                link.setDate(dateFormat.parse(nodeDate.getTextContent()));
+                            } catch (ParseException e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        final boolean isExistsExtension = isExistsExtension(nodeValue, requestExtensions);
+
+                        link.setMiddling(isExistsExtension);
+
+                        if (isExistsExtension) {
+                            final String body = deepenFunction.apply(nodeValue);
+                            parseToCache(body, deepenFunction, docBuilder, setCache);
+                        } else {
+                            HashSet<Link> curSet;
+                            if (setCache.isEmpty()) {
+                                curSet = new HashSet<>();
+                            } else {
+                                try {
+                                    curSet = setCache.take();
+                                } catch (InterruptedException e) {
+                                    curSet = new HashSet<>();
+                                }
+                            }
+
+                            curSet.add(link);
+
+                            try {
+                                setCache.put(curSet);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                });
     }
 
-    private boolean isExistsExtension(String fileName, Set<String> requestExtensions) {
+    private boolean isExistsExtension(String fileName, String[] requestExtensions) {
         if (isNull(fileName)) {
             return false;
         }
 
-        final String toLowerCase = fileName.toLowerCase();
-
-        Predicate<String> predicate = (extension) ->
-                toLowerCase.endsWith(extension.toLowerCase()) || toLowerCase.contains(".xml");
-
-        return requestExtensions.stream()
-                .anyMatch(predicate);
+        String toLowerCase = fileName.toLowerCase();
+        return hasArray(requestExtensions, toLowerCase::endsWith);
     }
 
-    private Optional<Node> findNodeLoc(Node node, Set<String> names) {
-        final NodeList childNodes = node.getChildNodes();
+    private Node findNode(Node root, String[] names) {
+        final NodeList childNodes = root.getChildNodes();
 
         for (int i = 0; i < childNodes.getLength(); i++) {
             final Node item = childNodes.item(i);
@@ -157,16 +203,20 @@ public class SitemapParser {
 
             final String nodeName = item.getNodeName();
 
-            final boolean anyMatch = names.stream().anyMatch(
-                    name -> name.toLowerCase().equals(nodeName.toLowerCase())
-            );
-
-            if (anyMatch) {
-                return Optional.of(item);
+            if (hasArray(names, name -> name.equalsIgnoreCase(nodeName))) {
+                return item;
             }
         }
 
-        return Optional.empty();
+        return null;
     }
 
+    private static boolean hasArray(String[] array, Predicate<String> filter){
+        for (String s : array) {
+            if(filter.test(s))
+                return true;
+        }
+
+        return false;
+    }
 }

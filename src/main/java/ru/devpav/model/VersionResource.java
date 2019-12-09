@@ -1,20 +1,21 @@
 package ru.devpav.model;
 
-import java.util.Date;
 import java.util.Objects;
 
 public class VersionResource implements Comparable<VersionResource> {
 
     private Resource resource;
-    private Date date = new Date();
+    private Long time;
 
-    public VersionResource(Resource resource) {
+    public VersionResource(Resource resource, Long time) {
         this.resource = resource;
+        this.time = time;
     }
+
 
     @Override
     public int compareTo(VersionResource o) {
-        return o.date.compareTo(this.date);
+        return o.time.compareTo(this.time);
     }
 
     @Override
@@ -23,19 +24,20 @@ public class VersionResource implements Comparable<VersionResource> {
         if (!(o instanceof VersionResource)) return false;
         VersionResource that = (VersionResource) o;
         return Objects.equals(resource, that.resource) &&
-                Objects.equals(date, that.date);
+                Objects.equals(time, that.time);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(resource, date);
+        return Objects.hash(resource, time);
     }
 
     @Override
     public String toString() {
         return "VersionResource{" +
                 "resource=" + resource +
-                ", date=" + date +
+                ", date=" + time +
                 '}';
     }
+
 }

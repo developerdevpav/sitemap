@@ -1,18 +1,19 @@
 package ru.devpav.model;
 
+import java.util.Date;
 import java.util.Objects;
 
 public class Link {
 
-    private String date;
+    private Date date;
     private String link;
     private Boolean middling;
 
-    public String getDate() {
+    public Date getDate() {
         return date;
     }
 
-    public void setDate(String date) {
+    public void setDate(Date date) {
         this.date = date;
     }
 
@@ -50,7 +51,7 @@ public class Link {
     @Override
     public String toString() {
         return "Link{" +
-                "date='" + date + '\'' +
+                "date=" + date +
                 ", link='" + link + '\'' +
                 ", middling=" + middling +
                 '}';

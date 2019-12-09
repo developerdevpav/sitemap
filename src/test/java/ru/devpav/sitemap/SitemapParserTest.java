@@ -15,11 +15,13 @@ import static org.junit.Assert.*;
 
 @RunWith(SpringRunner.class)
 public class SitemapParserTest {
+
     private final SitemapParser sitemapParser = new SitemapParser();
     private final ResourceInformant resourceInformant = new ResourceInformant(sitemapParser);
     private final LocalCacher localCacher = new LocalCacher(resourceInformant);
 
     private static final String TEST_RESOURCE = "https://fedpress.ru";
+
     @Test
     public void parseXML() throws MalformedURLException {
         localCacher.collect(Arrays.asList(TEST_RESOURCE, TEST_RESOURCE));
@@ -33,4 +35,5 @@ public class SitemapParserTest {
         assertEquals(versionResources.size(), 2);
         assertTrue(versionResources.first().compareTo(versionResources.last()) > 0);
     }
+
 }

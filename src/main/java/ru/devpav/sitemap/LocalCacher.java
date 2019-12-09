@@ -21,14 +21,6 @@ public class LocalCacher {
         this.resourceInformant = resourceInformant;
     }
 
-    public static void main(String[] args) throws InterruptedException {
-        SortedSet<VersionResource> versionResources = new TreeSet<>();
-        versionResources.add(new VersionResource(null));
-        Thread.sleep(1000);
-        versionResources.add(new VersionResource(null));
-
-        System.out.println(versionResources.size());
-    }
 
     public void collect(Collection<String> resourceUrls) {
         Consumer<Collection<String>> consumer = (urls) -> {
@@ -55,11 +47,7 @@ public class LocalCacher {
             urls.forEach(stringConsumer);
         };
 
-        ChunkThreadJoin.execute(
-                1,
-                resourceUrls,
-                consumer
-        );
+        ChunkThreadJoin.execute(1, resourceUrls, consumer);
     }
 
     public Map<Integer, SortedSet<VersionResource>> getCache() {
