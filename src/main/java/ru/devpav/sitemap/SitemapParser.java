@@ -43,6 +43,8 @@ public class SitemapParser {
         Set<String> finalizeLinks = new HashSet<>();
         try {
             HttpResponse<String> response;
+            // Как альтернативу быстрому выполнению, найти более низкоуревневый API для получения тела. Чтобы работать эффективнее
+            // Использовать пул подключений
             response = Unirest.get(String.valueOf(url)).asString();
             finalizeLinks = parse(response.getBody());
         } catch (Exception ex) {
