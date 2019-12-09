@@ -17,25 +17,27 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Objects.isNull;
 
 /*https://fedpress.ru/sitemap/2019-11-08.xml*/
 public class SitemapParser {
 
-    private static final Set<String> requestExtensions = new HashSet<>();
-    private static final Set<String> keyDate = new HashSet<>();
-    private static final Set<String> locLink = new HashSet<>();
+    // ВАЖНО!!! Не в коем случае нельзя менять из потоков
+    //
+    // Не стоит вызывать всегда toLowerCase у элементов массива, сделай их сразу маленькими
+    // Лучше использовать массив, будет быстрее, чем HashSet, по которому нужно пройти как по массиву
+    private static final String[] requestExtensions = Stream.of("xml", "php").map(String::toLowerCase).toArray(String[]::new);
+    private static final String[] keyDate = new String[]{"date", "lastmod"};
+    private static final String[] locLink = new String[]{"loc"};
 
     private final static Logger logger = LoggerFactory.getLogger(SitemapParser.class);
-
-    static {
-        requestExtensions.addAll(Arrays.asList("xml", "php"));
-        keyDate.addAll(Arrays.asList("date", "lastmod"));
-        locLink.addAll(Collections.singletonList("loc"));
-    }
 
     public Set<String> parse(URL url) {
         Set<String> finalizeLinks = new HashSet<>();
@@ -61,86 +63,120 @@ public class SitemapParser {
             return response.getBody();
         };
 
-        DocumentBuilder docBuilder = null;
-        try {
-            docBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-        } catch (ParserConfigurationException ignored) {
+        LinkedBlockingQueue<DocumentBuilder> docBuilderCache = new LinkedBlockingQueue<DocumentBuilder>();
+        LinkedBlockingQueue<HashSet<String>> setCache = new LinkedBlockingQueue<HashSet<String>>();
+        // DocumentBuilderFactory НЕ многопоточный и DocumentBuilder
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        for (int i = 0, threadSize = Runtime.getRuntime().availableProcessors() * 2; i < threadSize; i++) {
+            try {
+                // Первичное заполнение кэша
+                setCache.put(new HashSet<String>());
+                docBuilderCache.put(documentBuilderFactory.newDocumentBuilder());
+            } catch (InterruptedException | ParserConfigurationException e) {
+                e.printStackTrace();
+            }
         }
 
-        return parse(text, mapRequire, docBuilder);
+        parseToCache(text, mapRequire, docBuilderCache, setCache);
+        return setCache
+                .stream()
+                .flatMap(Collection::stream)
+                .collect(Collectors.toSet());
     }
 
-    private Set<String> parse(String urlXml, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
+    private void parseToCache(String urlXml, Function<String, String> deepenFunction,
+                              LinkedBlockingQueue<DocumentBuilder> docBuilderCache,
+                              LinkedBlockingQueue<HashSet<String>> setCache) {
 
-        if (isNull(docBuilder)) {
+        if (isNull(docBuilderCache)) {
             throw new RuntimeException("DocumentBuilder wasn't created");
         }
 
-        Document dom;
+        Document dom = null;
         try {
-            dom = docBuilder.parse(new InputSource(new StringReader(urlXml)));
+            DocumentBuilder builder;
+            if(docBuilderCache.isEmpty()){
+                builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            }else{
+                builder = docBuilderCache.take();
+            }
+
+            dom = builder.parse(new InputSource(new StringReader(urlXml)));
+            docBuilderCache.put(builder);
         } catch (SAXException | IOException e) {
-            return Collections.emptySet();
+            return;
+        } catch (ParserConfigurationException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
         if (isNull(dom)) {
             throw new RuntimeException("Root element external document not found");
         }
 
-        return parse(dom.getDocumentElement(), deepenFunction, docBuilder);
+        parseToCache(dom.getDocumentElement(), deepenFunction, docBuilderCache, setCache);
     }
 
 
-    private Set<String> parse(Node root, Function<String, String> deepenFunction, DocumentBuilder docBuilder) {
+    private void parseToCache(Node root, Function<String, String> deepenFunction, LinkedBlockingQueue<DocumentBuilder> docBuilder,
+                              LinkedBlockingQueue<HashSet<String>> setCache) {
         final NodeList childNodes = root.getChildNodes();
 
-        final Set<String> strings = new HashSet<>();
-
+        int len = childNodes.getLength();
+        final ArrayList<Node> docNodes = new ArrayList<Node>(len);
         for (int i = 0; i < childNodes.getLength(); i++) {
             final Node item = childNodes.item(i);
-            final Optional<Node> nodeLoc = findNodeLoc(item, locLink);
-
-            if (!nodeLoc.isPresent()) {
-                continue;
-            }
-
-            final Node loc = nodeLoc.get();
-
-            final String nodeValue = loc.getTextContent();
-
-            final boolean isExistsExtension = isExistsExtension(nodeValue, requestExtensions);
-
-            if (isExistsExtension) {
-                final String body = deepenFunction.apply(nodeValue);
-                final Set<String> returnedLinks = parse(body, deepenFunction, docBuilder);
-                strings.addAll(returnedLinks);
-            } else {
-                strings.add(nodeValue);
-            }
-
-            if (item.getChildNodes().getLength() == 0) {
-                return strings;
-            }
+            docNodes.add(item);
         }
 
-        return strings;
+        docNodes
+                .stream()
+                .parallel()
+                .map(item -> findNodeLoc(item, locLink))
+                .filter(Objects::nonNull)
+                .forEach(loc -> {
+                    final String nodeValue = loc.getTextContent();
+
+                    final boolean isExistsExtension = isExistsExtension(nodeValue, requestExtensions);
+
+                    if (isExistsExtension) {
+                        final String body = deepenFunction.apply(nodeValue);
+                        parseToCache(body, deepenFunction, docBuilder, setCache);
+                    } else {
+                        HashSet<String> curSet = null;
+                        // Если переделать алгоритм и брать на каждый потом 1 раз мапу и заполнять, должно стать быстрее
+                        if(setCache.isEmpty()){
+                            curSet = new HashSet<String>();
+                        }else{
+                            try {
+                                curSet = setCache.take();
+                            } catch (InterruptedException e) {
+                                curSet = new HashSet<String>();
+                            }
+                        }
+
+                        curSet.add(nodeValue);
+
+                        try {
+                            setCache.put(curSet);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                });
     }
 
-    private boolean isExistsExtension(String fileName, Set<String> requestExtensions) {
+    private boolean isExistsExtension(String fileName, String[] requestExtensions) {
         if (isNull(fileName)) {
             return false;
         }
 
-        final String toLowerCase = fileName.toLowerCase();
-
-        Predicate<String> predicate = (extension) ->
-                toLowerCase.endsWith(extension.toLowerCase()) || toLowerCase.contains(".xml");
-
-        return requestExtensions.stream()
-                .anyMatch(predicate);
+        String toLowerCase = fileName.toLowerCase();
+        return hasArray(requestExtensions, toLowerCase::endsWith);
     }
 
-    private Optional<Node> findNodeLoc(Node node, Set<String> names) {
+    private Node findNodeLoc(Node node, String[] names) {
         final NodeList childNodes = node.getChildNodes();
 
         for (int i = 0; i < childNodes.getLength(); i++) {
@@ -150,16 +186,20 @@ public class SitemapParser {
 
             final String nodeName = item.getNodeName();
 
-            final boolean anyMatch = names.stream().anyMatch(
-                    name -> name.equalsIgnoreCase(nodeName)
-            );
-
-            if (anyMatch) {
-                return Optional.of(item);
+            if (hasArray(names, name -> name.equalsIgnoreCase(nodeName))) {
+                return item;
             }
         }
-
-        return Optional.empty();
+        // Дабы не выделять лишнюю память
+        return null;
     }
 
+    private static boolean hasArray(String[] array, Predicate<String> filter){
+        for (String s : array) {
+            if(filter.test(s))
+                return true;
+        }
+
+        return false;
+    }
 }

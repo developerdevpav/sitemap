@@ -1,8 +1,5 @@
 package ru.devpav.sitemap;
 
-import kong.unirest.Unirest;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.test.context.junit4.SpringRunner;
@@ -23,7 +20,8 @@ public class SitemapParserTest {
     public void parseXML() throws MalformedURLException {
         final long nanoTime = System.nanoTime();
         final Set<String> strings = sitemapParser.parse(new URL(xmlConfiguration));
-        System.out.println((System.nanoTime() - nanoTime) / 1_000_000_000 + " ");
+        System.out.println("Work time: " + (System.nanoTime() - nanoTime) / 1_000_000_000);
+        System.out.println("Item count: " + strings.size());
         assertNotNull(strings);
         assertFalse(strings.isEmpty());
     }
