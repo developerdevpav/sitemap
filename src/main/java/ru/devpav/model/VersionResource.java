@@ -13,9 +13,17 @@ public class VersionResource implements Comparable<VersionResource> {
     }
 
 
+    public Resource getResource() {
+        return resource;
+    }
+
+    public Long getTime() {
+        return time;
+    }
+
     @Override
     public int compareTo(VersionResource o) {
-        return o.time.compareTo(this.time);
+        return this.time.compareTo(o.time);
     }
 
     @Override

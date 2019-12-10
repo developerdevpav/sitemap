@@ -1,6 +1,12 @@
 server:
   port: 8081
 
+logging:
+  level:
+    org:
+      apache:
+        http: WARN
+
 spring:
   application:
     name: intro-spring-data-redis
@@ -14,3 +20,5 @@ spring:
     host: localhost
     password: sber
     url: redis://${spring.redis.host}:${spring.redis.host}
+
+
