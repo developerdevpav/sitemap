@@ -3,22 +3,23 @@ package ru.devpav.config;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
-import ru.devpav.domain.Resource;
-import ru.devpav.repository.ResourceRepository;
+import ru.devpav.sitemap.SitemapService;
 
 @Component
 public class ApplicationStartup implements ApplicationRunner {
 
-    private final ResourceRepository resourceRepository;
 
-    public ApplicationStartup(ResourceRepository resourceRepository) {
-        this.resourceRepository = resourceRepository;
+    private final SitemapService sitemapService;
+
+    public ApplicationStartup(SitemapService sitemapService) {
+        this.sitemapService = sitemapService;
     }
 
+
+
     @Override
-    public void run(ApplicationArguments args) throws Exception {
-        final Resource resource = new Resource();
-        resource.setLink("https://value.ru");
+    public void run(ApplicationArguments args) {
+
     }
 
 }

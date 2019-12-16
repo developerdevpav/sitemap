@@ -2,10 +2,19 @@ package ru.devpav.domain;
 
 import java.util.Objects;
 
-public class BaseResource extends JetisBasic {
+public class BaseResource {
 
+    private Long id;
     private String link;
 
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public String getLink() {
         return link;
@@ -15,26 +24,18 @@ public class BaseResource extends JetisBasic {
         this.link = link;
     }
 
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof BaseResource)) return false;
-        if (!super.equals(o)) return false;
         BaseResource that = (BaseResource) o;
-        return Objects.equals(getLink(), that.getLink());
+        return Objects.equals(getId(), that.getId()) &&
+                Objects.equals(getLink(), that.getLink());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), getLink());
+        return Objects.hash(getId(), getLink());
     }
 
-
-    @Override
-    public String toString() {
-        return "BaseResource{" +
-                "link='" + link + '\'' +
-                '}';
-    }
 }
