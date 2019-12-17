@@ -1,30 +1,18 @@
 package ru.devpav.domain;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.Objects;
 import java.util.Set;
 
+@Getter
+@Setter
 public class Resource extends BaseResource {
 
     private String link;
     private Set<Link> links;
     private Long time;
-
-
-    public Set<Link> getLinks() {
-        return links;
-    }
-
-    public void setLinks(Set<Link> links) {
-        this.links = links;
-    }
-
-    public Long getTime() {
-        return time;
-    }
-
-    public void setTime(Long time) {
-        this.time = time;
-    }
 
 
     @Override

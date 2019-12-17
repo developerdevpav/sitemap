@@ -5,6 +5,7 @@ import kong.unirest.HttpResponse;
 import kong.unirest.Unirest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import ru.devpav.util.URLUtil;
 
 import java.util.HashSet;
 import java.util.Objects;
@@ -16,6 +17,8 @@ import java.util.stream.Stream;
 public class ResourceInformant {
 
     private static final Integer SOCKET_TIME_WAIT = 10000;
+
+
 
     public Set<String> getSitemapXmlLinks(String url) {
 
@@ -47,9 +50,12 @@ public class ResourceInformant {
 
         return Stream.of(lines)
                 .filter(line -> line.contains("sitemap"))
-                .map(line -> line.replace("sitemap: ", ""))
+                .map(URLUtil::substringRegexp)
                 .collect(Collectors.toSet());
 
     }
+
+
+
 
 }

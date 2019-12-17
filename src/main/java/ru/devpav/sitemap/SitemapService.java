@@ -8,6 +8,7 @@ import ru.devpav.domain.Resource;
 
 import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,19 +25,20 @@ public class SitemapService {
     }
 
 
-    public Set<Resource> getLinks(Set<String> resourceUrls) {
-        return resourceUrls.stream()
-                .parallel()
-                .map(this::getLinks)
-                .collect(Collectors.toSet());
-    }
-
     @Getter
     @Setter
     public class AnalyticResource {
         private String resource;
         private Long sitemap;
         private Long totalLink;
+    }
+
+
+    public Set<Resource> getLinks(Set<String> resourceUrls) {
+        return resourceUrls.stream()
+                .parallel()
+                .map(this::getLinks)
+                .collect(Collectors.toSet());
     }
 
     public Set<String> getStringLink(String url) {
@@ -67,7 +69,6 @@ public class SitemapService {
         return analyticResource;
     }
 
-
     public Resource getLinks(String url) {
         if (url.endsWith("/")) {
             url = url.substring(0, url.length() - 1);
@@ -97,6 +98,15 @@ public class SitemapService {
         resource.setLinks(sets);
 
         return resource;
+    }
+
+    public Set<Link> diffLinks(Set<Link> newLinks, Set<Link> oldLinks) {
+        final Map<String, Link> oldMap = oldLinks.stream()
+                .collect(Collectors.toMap(Link::getLink, link -> link));
+
+        return newLinks.stream()
+                .filter(link -> oldMap.containsKey(link.getLink()))
+                .collect(Collectors.toSet());
     }
 
 }
