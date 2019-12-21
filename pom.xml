@@ -5,8 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>ru.devpav</groupId>
-    <artifactId>JetidBigData</artifactId>
+    <artifactId>sitemap-parser</artifactId>
     <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <jar.finalName>${project.name}</jar.finalName>
+    </properties>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -47,4 +51,9 @@
             <version>3.2.00</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <finalName>${jar.finalName}</finalName>
+    </build>
+
 </project>
