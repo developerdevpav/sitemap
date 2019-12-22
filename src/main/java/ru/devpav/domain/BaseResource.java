@@ -1,10 +1,21 @@
 package ru.devpav.domain;
 
+import lombok.Getter;
+import lombok.Setter;
+
+import javax.persistence.*;
 import java.util.Objects;
 
+@MappedSuperclass
+@Getter
+@Setter
 public class BaseResource {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "link")
     private String link;
 
 

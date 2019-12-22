@@ -3,17 +3,21 @@ package ru.devpav.domain;
 import lombok.Getter;
 import lombok.Setter;
 
+import javax.persistence.*;
 import java.util.Objects;
 import java.util.Set;
 
 @Getter
 @Setter
+@Entity
+@Table(name = "tbx_resource")
 public class Resource extends BaseResource {
 
-    private String link;
+    @OneToMany(mappedBy = "parent", orphanRemoval = true, cascade = CascadeType.ALL)
     private Set<Link> links;
-    private Long time;
 
+    @Column(name = "time")
+    private Long time;
 
     @Override
     public boolean equals(Object o) {
@@ -21,21 +25,18 @@ public class Resource extends BaseResource {
         if (!(o instanceof Resource)) return false;
         if (!super.equals(o)) return false;
         Resource resource = (Resource) o;
-        return Objects.equals(getLink(), resource.getLink()) &&
-                Objects.equals(getLinks(), resource.getLinks()) &&
-                Objects.equals(getTime(), resource.getTime());
+        return Objects.equals(getTime(), resource.getTime());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), getLink(), getLinks(), getTime());
+        return Objects.hash(super.hashCode(), getTime());
     }
 
     @Override
     public String toString() {
         return "Resource{" +
-                "link='" + link + '\'' +
-                ", links=" + links +
+                "links=" + links +
                 ", time=" + time +
                 '}';
     }

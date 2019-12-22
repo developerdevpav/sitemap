@@ -1,0 +1,13 @@
+spring:
+  profiles:
+    active: prod
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/sber
+    username: sber
+    password: sber
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
