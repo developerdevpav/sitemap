@@ -1,0 +1,19 @@
+version: "2"
+
+services:
+
+  nginx:
+    container_name: "nginx"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TOKEN_GIT: ${TOKEN_GIT}
+        USERNAME_GIT: ${USERNAME_GIT}
+        TAG_CLIENT: ${TAG_CLIENT}
+        REPOSITORY_CLIENT: ${REPOSITORY_CLIENT}
+        ENV_CLIENT: ${ENV_CLIENT}
+    ports:
+      - "80:80"
+    env_file:
+      - ../.env

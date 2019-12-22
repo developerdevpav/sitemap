@@ -1,0 +1,40 @@
+version: '2'
+
+services:
+
+  postgres:
+    extends:
+      file: postgres/postgres.yml
+      service: postgres
+    volumes:
+      - psql-volume:/var/lib/postgresql/data
+    networks:
+      - sber
+
+  backend:
+    extends:
+      file: java/java.yml
+      service: backend
+    volumes:
+      - backend-volume:/app/
+    networks:
+      - sber
+    depends_on:
+      - postgres
+
+  nginx:
+    extends:
+      file: nginx/nginx.yml
+      service: nginx
+    networks:
+      - sber
+    depends_on:
+      - backend
+
+networks:
+  sber:
+    driver: bridge
+
+volumes:
+  backend-volume:
+  psql-volume:

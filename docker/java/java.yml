@@ -1,0 +1,16 @@
+version: '2'
+
+services:
+
+  backend:
+    container_name: "backend"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TOKEN_GIT: ${TOKEN_GIT}
+        USERNAME_GIT: ${USERNAME_GIT}
+        REPOSITORY_SERVER: ${REPOSITORY_SERVER}
+        PROFILE_SERVER: ${PROFILE_SERVER}
+    env_file:
+      - ../.env
