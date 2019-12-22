@@ -1,0 +1,11 @@
+version: "2"
+
+services:
+
+  postgres:
+    container_name: "postgres"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ../.env
