@@ -1,5 +1,6 @@
 package ru.devpav.domain;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,9 +16,6 @@ public class Link extends BaseResource {
     @Column(name = "time")
     private Long time;
 
-    @Column(name = "link")
-    private String link;
-
     @Column(name = "is_middling")
     private Boolean middling = false;
 
@@ -29,6 +27,11 @@ public class Link extends BaseResource {
 
     @ManyToOne(cascade = CascadeType.ALL)
     private Link parent;
+
+    @ManyToOne(cascade = CascadeType.ALL)
+    @JsonBackReference("link-resource")
+    @JoinColumn(name = "resource_id")
+    private Resource resource;
 
     @Override
     public boolean equals(Object o) {
@@ -53,7 +56,7 @@ public class Link extends BaseResource {
     public String toString() {
         return "Link{" +
                 "time=" + time +
-                ", link='" + link + '\'' +
+                ", link='" + getLink() + '\'' +
                 ", middling=" + middling +
                 ", sitemap=" + sitemap +
                 ", hash=" + hash +

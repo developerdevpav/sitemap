@@ -13,7 +13,9 @@ import java.util.Set;
 @Table(name = "tbx_resource")
 public class Resource extends BaseResource {
 
-    @OneToMany(mappedBy = "parent", orphanRemoval = true, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "resource",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true)
     private Set<Link> links;
 
     @Column(name = "time")

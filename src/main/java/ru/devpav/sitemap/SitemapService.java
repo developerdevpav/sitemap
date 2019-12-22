@@ -2,6 +2,7 @@ package ru.devpav.sitemap;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.devpav.domain.Link;
@@ -13,6 +14,7 @@ import java.util.stream.Collectors;
 
 
 @Component
+@Slf4j
 public class SitemapService {
 
     private final ResourceInformant resourceInformant;
@@ -78,6 +80,8 @@ public class SitemapService {
             url = url.substring(0, url.length() - 1);
         }
 
+        log.info("Start parse url: {}", url);
+
         Resource resource = new Resource();
         resource.setTime(new Date().getTime());
         resource.setLink(url);
@@ -100,13 +104,20 @@ public class SitemapService {
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
 
+        log.info("Resource {} has {} LINKS", url, sets.size());
+
+
         final Resource cachedResource = resourceRepository.findByLink(resource.getLink());
 
         if (Objects.nonNull(cachedResource)) {
+            log.info("Resource exists in cache {}", url);
             final Set<Link> oldLinks = cachedResource.getLinks();
             final Set<Link> links = diffLinks(sets, oldLinks);
+            log.info("Resource {} has [SIZE: {}] DIFF LINKS", url, links.size());
             cachedResource.getLinks().addAll(links);
+            return resourceRepository.saveAndFlush(cachedResource);
         } else {
+            log.info("Resource doesn't exists in cache {}", url);
             resource.setLinks(sets);
         }
 

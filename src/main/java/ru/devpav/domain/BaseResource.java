@@ -15,7 +15,7 @@ public class BaseResource {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "link")
+    @Column(name = "link", columnDefinition="text")
     private String link;
 
 
