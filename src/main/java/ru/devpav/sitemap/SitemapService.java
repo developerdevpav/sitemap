@@ -27,7 +27,7 @@ public class SitemapService {
 
     @Getter
     @Setter
-    public class AnalyticResource {
+    public static class AnalyticResource {
         private String resource;
         private Long sitemap;
         private Long totalLink;
@@ -90,7 +90,8 @@ public class SitemapService {
                     return link;
                 }).collect(Collectors.toSet());
 
-        final Set<Link> sets = mapSitemap.stream()
+        final Set<Link> sets = mapSitemap
+                .parallelStream()
                 .map(sitemapParser::parse)
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());

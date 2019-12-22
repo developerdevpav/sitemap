@@ -4,12 +4,14 @@ import kong.unirest.HttpResponse;
 import kong.unirest.Unirest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import ru.devpav.domain.Link;
+import ru.devpav.repository.LinkRepository;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -31,9 +33,15 @@ import static java.util.Objects.isNull;
 @Slf4j
 public class SitemapParser {
 
-    private static final String[] requestExtensions = Stream.of("xml", "php").map(String::toLowerCase).toArray(String[]::new);
+    private static final String[] requestExtensions = Stream.of(".xml", ".php").map(String::toLowerCase).toArray(String[]::new);
     private static final String[] keyDate = new String[]{"date", "lastmod"};
     private static final String[] locLink = new String[]{"loc"};
+
+    private final LinkRepository linkRepository;
+
+    public SitemapParser(LinkRepository linkRepository) {
+        this.linkRepository = linkRepository;
+    }
 
 
     public Set<Link> parse(Link root) {
@@ -117,7 +125,7 @@ public class SitemapParser {
         parseToCache(dom.getDocumentElement(), deepenFunction, docBuilderCache, setCache, rootLink);
     }
 
-
+    @Transactional(readOnly = true)
     private void parseToCache(Node root,
                               Function<String, String> deepenFunction,
                               BlockingQueue<DocumentBuilder> docBuilder,
@@ -148,8 +156,22 @@ public class SitemapParser {
 
                     if (isExistsExtension) {
                         final String body = deepenFunction.apply(nodeValue);
+                        final int hash = Objects.hash(body);
+
+                        link.setHash(hash);
                         link.setSitemap(true);
-                        parseToCache(body, deepenFunction, docBuilder, setCache, link);
+
+                        final boolean notChange = linkRepository.existsByLinkAndHashAndMiddling(
+                                link.getLink(),
+                                hash,
+                                link.getMiddling()
+                        );
+
+                        if (!notChange) {
+                            parseToCache(body, deepenFunction, docBuilder, setCache, link);
+                        } else {
+                            log.info("Link: {} isn't change", link.getLink());
+                        }
                     } else {
                         rootLink.setMiddling(true);
                     }

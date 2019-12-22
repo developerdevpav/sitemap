@@ -5,4 +5,7 @@ import ru.devpav.domain.Link;
 
 @Repository
 public interface LinkRepository extends BaseResourceRepository<Link> {
+
+    boolean existsByLinkAndHashAndMiddling(String link, Integer hash, Boolean middling);
+
 }
