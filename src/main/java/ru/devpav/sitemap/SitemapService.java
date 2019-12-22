@@ -3,13 +3,12 @@ package ru.devpav.sitemap;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import ru.devpav.domain.Link;
 import ru.devpav.domain.Resource;
+import ru.devpav.repository.ResourceRepository;
 
-import java.util.Collection;
-import java.util.Date;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -18,10 +17,14 @@ public class SitemapService {
 
     private final ResourceInformant resourceInformant;
     private final SitemapParser sitemapParser;
+    private final ResourceRepository resourceRepository;
 
-    public SitemapService(ResourceInformant resourceInformant, SitemapParser sitemapParser) {
+    public SitemapService(ResourceInformant resourceInformant,
+                          SitemapParser sitemapParser,
+                          ResourceRepository resourceRepository) {
         this.resourceInformant = resourceInformant;
         this.sitemapParser = sitemapParser;
+        this.resourceRepository = resourceRepository;
     }
 
 
@@ -51,6 +54,7 @@ public class SitemapService {
                 .collect(Collectors.toSet());
     }
 
+    @Transactional
     public AnalyticResource getAnalyticResource(String url) {
         final Resource resource = getLinks(url);
 
@@ -96,9 +100,17 @@ public class SitemapService {
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
 
-        resource.setLinks(sets);
+        final Resource cachedResource = resourceRepository.findByLink(resource.getLink());
 
-        return resource;
+        if (Objects.nonNull(cachedResource)) {
+            final Set<Link> oldLinks = cachedResource.getLinks();
+            final Set<Link> links = diffLinks(sets, oldLinks);
+            cachedResource.getLinks().addAll(links);
+        } else {
+            resource.setLinks(sets);
+        }
+
+        return resourceRepository.saveAndFlush(resource);
     }
 
     public Set<Link> diffLinks(Set<Link> newLinks, Set<Link> oldLinks) {

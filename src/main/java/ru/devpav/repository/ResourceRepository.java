@@ -5,4 +5,6 @@ import ru.devpav.domain.Resource;
 
 @Repository
 public interface ResourceRepository extends BaseResourceRepository<Resource> {
+
+
 }
