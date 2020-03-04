@@ -3,11 +3,12 @@ spring:
     active: dev
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/sber
+    url: jdbc:h2:mem:testdb
     username: sber
     password: sber
-    driver-class-name: org.postgresql.Driver
+    driver-class-name: org.h2.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
+    database-platform: org.hibernate.dialect.H2Dialect

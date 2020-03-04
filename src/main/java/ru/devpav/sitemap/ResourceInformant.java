@@ -18,8 +18,6 @@ public class ResourceInformant {
 
     private static final Integer SOCKET_TIME_WAIT = 10000;
 
-
-
     public Set<String> getSitemapXmlLinks(String url) {
 
         final String robotUrl = url + "/robots.txt";
